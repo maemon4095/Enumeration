@@ -1,0 +1,11 @@
+﻿<#@ template language="C#" linePragmas="false" debug="false" hostspecific="false" visibility="internal" #>
+<#@ assembly name="System.Core" #>
+<#@ output extension=".cs" #>
+
+namespace Enumeration
+{
+	#pragma warning disable IDE0002
+	[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct)]
+	internal sealed class EnumerationAttribute : global::System.Attribute { }
+	#pragma warning restore IDE0002
+}
