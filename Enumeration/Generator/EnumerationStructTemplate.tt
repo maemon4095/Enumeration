@@ -4,6 +4,9 @@
 <#@ import namespace="System.Text" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="Microsoft.CodeAnalysis" #>
+
+#pragma warning disable CS0169, CS0649
+
 <# if(this.Options.IsNamespaceSpecified) { #>
 namespace <#= this.Options.Namespace #>
 {
@@ -17,12 +20,24 @@ namespace <#= this.Options.Namespace #>
 		struct __Implement
 		{
 			[global::System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]
-			public struct Unmanaged 
+			public struct Union 
 			{
 <# foreach(var method in this.Options.Methods) { #>
+<# var referenceLeft = this.Options.ReferenceTypeCount; #>
 				public struct __<#= method.Name #>
 				{
-<# foreach(var parameter in method.Parameters.Where(p => (p.Type is INamedTypeSymbol t) && !t.IsGenericType && t.IsUnmanagedType)) { #>
+<# foreach(var parameter in method.Parameters.Where(p => p.Type.IsReferenceType)) { #>
+<# referenceLeft--; #>
+<# if(parameter.Type is ITypeParameterSymbol) { #>
+					public object <#= parameter.Name #>;
+<# } else { #>
+					public <#= Helper.FullNameOf(parameter.Type) #> <#= parameter.Name #>;
+<# } #>
+<# } #>
+<# for(var index = 0; index < referenceLeft; ++index) { #>
+					object __dummy_<#= index #>;
+<# } #>
+<# foreach(var parameter in method.Parameters.Where(p => p.Type is not ITypeParameterSymbol && p.Type.IsUnmanagedType)) { #>
 					public <#= Helper.FullNameOf(parameter.Type) #> <#= parameter.Name #>;
 <# } #>
 				}
@@ -34,12 +49,9 @@ namespace <#= this.Options.Namespace #>
 <# } #>
 			}
 
-			public struct Managed
+			public struct Serial
 			{
-<# for(var i = 0; i < this.Options.ReferenceTypeCount; ++i) { #>
-				public global::System.Object __reference_<#= i #>;
-<# } #>
-<# foreach(var (type, count) in this.Options.OtherTypes) { #>
+<# foreach(var (type, count) in this.Options.SerialTypes) { #>
 <# for(var i = 0; i < count; ++i) { #>
 				public <#= Helper.FullNameOf(type) #> <#= Helper.EscapedFullNameOf(type) #>_<#= i #>;
 <# } #>
@@ -47,8 +59,8 @@ namespace <#= this.Options.Namespace #>
 			}
 
 			public Case type;
-			public Unmanaged unmanaged;
-			public Managed managed;
+			public Union union;
+			public Serial serial;
 
 			public <#= this.Options.Identifier #> As() => global::System.Runtime.CompilerServices.Unsafe.As<__Implement, <#= this.Options.Identifier #>>(ref this);
 		}
@@ -58,17 +70,16 @@ namespace <#= this.Options.Namespace #>
 		{
 			var impl = default(__Implement);
 			impl.type = Case.<#= method.Name #>;
+
 <# foreach(var parameter in method.Parameters) { #>
-<# if(parameter.Type.IsReferenceType) { #>
-<# var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && p.Type.IsReferenceType); #>
-			impl.managed.__reference_<#= index #> = <#= parameter.Name #>;
-<# } else if(parameter.Type is not INamedTypeSymbol || !parameter.Type.IsUnmanagedType) { #>
-<# var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && Helper.SymbolEquals(p.Type, parameter.Type)); #>
-			impl.managed.<#= Helper.EscapedFullNameOf(parameter.Type) #>_<#= index #> = <#= parameter.Name #>;
+<# if(Helper.IsSerialType(parameter.Type)) { #>
+<# var index = method.Parameters.Take(parameter.Ordinal).Count(p => Helper.SymbolEquals(p.Type, parameter.Type)); #>
+			impl.serial.<#= Helper.FullNameOf(parameter.Type) #>_<#= index #> = <#= parameter.Name #>;
 <# } else { #>
-			impl.unmanaged.<#= method.Name #>.<#= parameter.Name #> = <#= parameter.Name #>;
+			impl.union.<#= method.Name #>.<#= parameter.Name #> = <#= parameter.Name #>;
 <# } #>
 <# } #>
+
 			return impl.As();
 		}
 
@@ -78,14 +89,14 @@ namespace <#= this.Options.Namespace #>
 			if (__self.Type == Case.<#= method.Name #>)
 			{
 <# foreach(var parameter in method.Parameters) { #>
-<# if(parameter.Type.IsReferenceType) { #>
-<# var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && p.Type.IsReferenceType); #>
-				<#= parameter.Name #> = (<#= Helper.FullNameOf(parameter.Type) #>)__self.__implement.managed.__reference_<#= index #>;
-<# } else if(parameter.Type is not INamedTypeSymbol || !parameter.Type.IsUnmanagedType) { #>
-<# var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && Helper.SymbolEquals(p.Type, parameter.Type)); #>
-				<#= parameter.Name #> = __self.__implement.managed.<#= Helper.EscapedFullNameOf(parameter.Type) #>_<#= index #>;
+<# var fullName = Helper.FullNameOf(parameter.Type); #>
+<# if(Helper.IsSerialType(parameter.Type)) { #>
+<# var index = method.Parameters.Take(parameter.Ordinal).Count(p => Helper.SymbolEquals(p.Type, parameter.Type)); #>
+				<#= parameter.Name #> = __self.__implement.serial.<#= fullName #>_<#= index #>;
+<# } else if(parameter.Type is ITypeParameterSymbol) { #>
+				<#= parameter.Name #> = (<#= fullName #>)__self.__implement.union.<#= method.Name #>.<#= parameter.Name #>;
 <# } else { #>
-				<#= parameter.Name #> = __self.__implement.unmanaged.<#= method.Name #>.<#= parameter.Name #>;
+				<#= parameter.Name #> = __self.__implement.union.<#= method.Name #>.<#= parameter.Name #>;
 <# } #>
 <# } #>
 				return true;
@@ -104,3 +115,5 @@ namespace <#= this.Options.Namespace #>
 <# if(this.Options.IsNamespaceSpecified) { #>
 }
 <# } #>
+
+#pragma warning restore CS0169, CS0649

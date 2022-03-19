@@ -47,9 +47,9 @@ namespace <#= this.Options.Namespace #>
 		{
 			if (__self.Type == Case.<#= method.Name #>)
 			{
-				var instance = (__self as __<#= method.Name#>)!;
+				var __instance = (__<#= method.Name#>)__self;
 <# foreach(var parameter in method.Parameters) { #>
-				<#= parameter.Name #> = instance.<#= parameter.Name #>;
+				<#= parameter.Name #> = __instance.<#= parameter.Name #>;
 <# } #>
 				return true;
 			}

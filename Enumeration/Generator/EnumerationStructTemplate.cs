@@ -26,6 +26,7 @@ namespace Enumeration.Generator
         /// </summary>
         public virtual string TransformText()
         {
+            this.Write("\r\n#pragma warning disable CS0169, CS0649\r\n\r\n");
  if(this.Options.IsNamespaceSpecified) { 
             this.Write("namespace ");
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Namespace));
@@ -37,12 +38,32 @@ namespace Enumeration.Generator
             this.Write(this.ToStringHelper.ToStringWithCulture(string.Join(", ", this.Options.Methods.Select(method => method.Name))));
             this.Write("\r\n\t\t}\r\n\t\tstruct __Implement\r\n\t\t{\r\n\t\t\t[global::System.Runtime.InteropServices.Stru" +
                     "ctLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]\r\n\t\t\tpublic struct " +
-                    "Unmanaged \r\n\t\t\t{\r\n");
+                    "Union \r\n\t\t\t{\r\n");
  foreach(var method in this.Options.Methods) { 
+ var referenceLeft = this.Options.ReferenceTypeCount; 
             this.Write("\t\t\t\tpublic struct __");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write("\r\n\t\t\t\t{\r\n");
- foreach(var parameter in method.Parameters.Where(p => (p.Type is INamedTypeSymbol t) && !t.IsGenericType && t.IsUnmanagedType)) { 
+ foreach(var parameter in method.Parameters.Where(p => p.Type.IsReferenceType)) { 
+ referenceLeft--; 
+ if(parameter.Type is ITypeParameterSymbol) { 
+            this.Write("\t\t\t\t\tpublic object ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
+            this.Write(";\r\n");
+ } else { 
+            this.Write("\t\t\t\t\tpublic ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
+            this.Write(" ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
+            this.Write(";\r\n");
+ } 
+ } 
+ for(var index = 0; index < referenceLeft; ++index) { 
+            this.Write("\t\t\t\t\tobject __dummy_");
+            this.Write(this.ToStringHelper.ToStringWithCulture(index));
+            this.Write(";\r\n");
+ } 
+ foreach(var parameter in method.Parameters.Where(p => p.Type is not ITypeParameterSymbol && p.Type.IsUnmanagedType)) { 
             this.Write("\t\t\t\t\tpublic ");
             this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
             this.Write(" ");
@@ -59,13 +80,8 @@ namespace Enumeration.Generator
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write(";\r\n");
  } 
-            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic struct Managed\r\n\t\t\t{\r\n");
- for(var i = 0; i < this.Options.ReferenceTypeCount; ++i) { 
-            this.Write("\t\t\t\tpublic global::System.Object __reference_");
-            this.Write(this.ToStringHelper.ToStringWithCulture(i));
-            this.Write(";\r\n");
- } 
- foreach(var (type, count) in this.Options.OtherTypes) { 
+            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic struct Serial\r\n\t\t\t{\r\n");
+ foreach(var (type, count) in this.Options.SerialTypes) { 
  for(var i = 0; i < count; ++i) { 
             this.Write("\t\t\t\tpublic ");
             this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(type)));
@@ -76,8 +92,8 @@ namespace Enumeration.Generator
             this.Write(";\r\n");
  } 
  } 
-            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic Case type;\r\n\t\t\tpublic Unmanaged unmanaged;\r\n\t\t\tpublic Managed m" +
-                    "anaged;\r\n\r\n\t\t\tpublic ");
+            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic Case type;\r\n\t\t\tpublic Union union;\r\n\t\t\tpublic Serial serial;\r\n\r" +
+                    "\n\t\t\tpublic ");
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
             this.Write(" As() => global::System.Runtime.CompilerServices.Unsafe.As<__Implement, ");
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
@@ -91,26 +107,19 @@ namespace Enumeration.Generator
             this.Write(this.ToStringHelper.ToStringWithCulture(Helper.ParamsOf(method)));
             this.Write(") \r\n\t\t{\r\n\t\t\tvar impl = default(__Implement);\r\n\t\t\timpl.type = Case.");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write(";\r\n");
+            this.Write(";\r\n\r\n");
  foreach(var parameter in method.Parameters) { 
- if(parameter.Type.IsReferenceType) { 
- var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && p.Type.IsReferenceType); 
-            this.Write("\t\t\timpl.managed.__reference_");
-            this.Write(this.ToStringHelper.ToStringWithCulture(index));
-            this.Write(" = ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(";\r\n");
- } else if(parameter.Type is not INamedTypeSymbol || !parameter.Type.IsUnmanagedType) { 
- var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && Helper.SymbolEquals(p.Type, parameter.Type)); 
-            this.Write("\t\t\timpl.managed.");
-            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.EscapedFullNameOf(parameter.Type)));
+ if(Helper.IsSerialType(parameter.Type)) { 
+ var index = method.Parameters.Take(parameter.Ordinal).Count(p => Helper.SymbolEquals(p.Type, parameter.Type)); 
+            this.Write("\t\t\timpl.serial.");
+            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
             this.Write("_");
             this.Write(this.ToStringHelper.ToStringWithCulture(index));
             this.Write(" = ");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
             this.Write(";\r\n");
  } else { 
-            this.Write("\t\t\timpl.unmanaged.");
+            this.Write("\t\t\timpl.union.");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write(".");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
@@ -119,8 +128,9 @@ namespace Enumeration.Generator
             this.Write(";\r\n");
  } 
  } 
-            this.Write("\t\t\treturn impl.As();\r\n\t\t}\r\n\r\n\t\t[global::System.ComponentModel.EditorBrowsable(glo" +
-                    "bal::System.ComponentModel.EditorBrowsableState.Never)]\r\n\t\tpublic static bool ");
+            this.Write("\r\n\t\t\treturn impl.As();\r\n\t\t}\r\n\r\n\t\t[global::System.ComponentModel.EditorBrowsable(g" +
+                    "lobal::System.ComponentModel.EditorBrowsableState.Never)]\r\n\t\tpublic static bool " +
+                    "");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write("(");
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.DeconstructMethodParamsOf(method)));
@@ -128,28 +138,30 @@ namespace Enumeration.Generator
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write(")\r\n\t\t\t{\r\n");
  foreach(var parameter in method.Parameters) { 
- if(parameter.Type.IsReferenceType) { 
- var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && p.Type.IsReferenceType); 
+ var fullName = Helper.FullNameOf(parameter.Type); 
+ if(Helper.IsSerialType(parameter.Type)) { 
+ var index = method.Parameters.Take(parameter.Ordinal).Count(p => Helper.SymbolEquals(p.Type, parameter.Type)); 
+            this.Write("\t\t\t\t");
+            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
+            this.Write(" = __self.__implement.serial.");
+            this.Write(this.ToStringHelper.ToStringWithCulture(fullName));
+            this.Write("_");
+            this.Write(this.ToStringHelper.ToStringWithCulture(index));
+            this.Write(";\r\n");
+ } else if(parameter.Type is ITypeParameterSymbol) { 
             this.Write("\t\t\t\t");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
             this.Write(" = (");
-            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
-            this.Write(")__self.__implement.managed.__reference_");
-            this.Write(this.ToStringHelper.ToStringWithCulture(index));
-            this.Write(";\r\n");
- } else if(parameter.Type is not INamedTypeSymbol || !parameter.Type.IsUnmanagedType) { 
- var index = method.Parameters.Count(p => p.Ordinal < parameter.Ordinal && Helper.SymbolEquals(p.Type, parameter.Type)); 
-            this.Write("\t\t\t\t");
+            this.Write(this.ToStringHelper.ToStringWithCulture(fullName));
+            this.Write(")__self.__implement.union.");
+            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
+            this.Write(".");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(" = __self.__implement.managed.");
-            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.EscapedFullNameOf(parameter.Type)));
-            this.Write("_");
-            this.Write(this.ToStringHelper.ToStringWithCulture(index));
             this.Write(";\r\n");
  } else { 
             this.Write("\t\t\t\t");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(" = __self.__implement.unmanaged.");
+            this.Write(" = __self.__implement.union.");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write(".");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
@@ -169,6 +181,7 @@ namespace Enumeration.Generator
  if(this.Options.IsNamespaceSpecified) { 
             this.Write("}\r\n");
  } 
+            this.Write("\r\n#pragma warning restore CS0169, CS0649");
             return this.GenerationEnvironment.ToString();
         }
     }

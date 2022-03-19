@@ -86,13 +86,13 @@ namespace Enumeration.Generator
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.DeconstructMethodParamsOf(method)));
             this.Write(") \r\n\t\t{\r\n\t\t\tif (__self.Type == Case.");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write(")\r\n\t\t\t{\r\n\t\t\t\tvar instance = (__self as __");
+            this.Write(")\r\n\t\t\t{\r\n\t\t\t\tvar __instance = (__");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write(")!;\r\n");
+            this.Write(")__self;\r\n");
  foreach(var parameter in method.Parameters) { 
             this.Write("\t\t\t\t");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(" = instance.");
+            this.Write(" = __instance.");
             this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
             this.Write(";\r\n");
  } 
