@@ -1,6 +1,7 @@
 ﻿using Enumeration;
 
 Console.WriteLine(B<int, string>.M0());
+Console.ReadLine();
 
 #if true
 [Enumeration]

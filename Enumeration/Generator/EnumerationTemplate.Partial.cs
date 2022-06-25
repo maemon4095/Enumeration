@@ -8,22 +8,13 @@ namespace Enumeration.Generator;
 
 readonly struct EnumerationOptions
 {
-    static SymbolDisplayFormat NameOnly { get; } = new SymbolDisplayFormat(genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters | SymbolDisplayGenericsOptions.IncludeVariance);
-
     public EnumerationOptions(INamedTypeSymbol symbol)
     {
         var namespaceSymbol = symbol.ContainingNamespace;
-        this.Namespace = namespaceSymbol.IsGlobalNamespace ? null : namespaceSymbol.ToDisplayString();
-        this.Identifier = Helper.FullNameOf(symbol);
-        this.Symbol = symbol;
-        this.Name = symbol.ToDisplayString(NameOnly);
+        var syntax = (symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TypeDeclarationSyntax) ?? throw new NotSupportedException();
         var methods = symbol.GetMembers().OfType<IMethodSymbol>()
                             .Where(member => member.DeclaredAccessibility == Accessibility.Public && member.IsStatic && member.IsPartialDefinition && !member.IsGenericMethod)
                             .ToImmutableArray();
-        this.Methods = methods;
-        var syntax = (symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TypeDeclarationSyntax) ?? throw new NotSupportedException();
-        this.Syntax = syntax;
-        this.TypeParameterConstraints = syntax.ConstraintClauses;
 
         var referenceTypeCount = 0;
         var types = new Dictionary<ITypeSymbol, (int Count, int Temp)>(SymbolEqualityComparer.Default);
@@ -46,7 +37,6 @@ readonly struct EnumerationOptions
             }
             if (referenceTypeCount < refCount) referenceTypeCount = refCount;
 
-
             var keys = types.Keys;
             for (var i = 0; i < keys.Count; ++i)
             {
@@ -56,6 +46,13 @@ readonly struct EnumerationOptions
             }
         }
 
+        this.Namespace = namespaceSymbol.IsGlobalNamespace ? null : namespaceSymbol.ToDisplayString();
+        this.Name = Helper.NameOf(symbol);
+        this.FullName = Helper.FullNameOf(symbol);
+        this.Symbol = symbol;
+        this.Methods = methods;
+        this.Syntax = syntax;
+        this.TypeParameterConstraints = syntax.ConstraintClauses;
         this.SerialTypes = types.Select(pair => (pair.Key, pair.Value.Count)).ToImmutableArray();
         this.ReferenceTypeCount = referenceTypeCount;
     }
@@ -64,7 +61,7 @@ readonly struct EnumerationOptions
     public int ReferenceTypeCount { get; }
     public string? Namespace { get; }
     public string Name { get; }
-    public string Identifier { get; }
+    public string FullName { get; }
     public INamedTypeSymbol Symbol { get; }
     public ImmutableArray<IMethodSymbol> Methods { get; }
     public string AccessibilityString => SyntaxFacts.GetText(this.Symbol.DeclaredAccessibility);
@@ -72,43 +69,51 @@ readonly struct EnumerationOptions
     public TypeDeclarationSyntax Syntax { get; }
     public SyntaxList<TypeParameterConstraintClauseSyntax> TypeParameterConstraints { get; }
 
+
+    public string DeconstructMethodSignatureOf(IMethodSymbol method)
+    {
+        var builder = new StringBuilder();
+        builder.Append(method.Name);
+        builder.Append('(');
+        this.WriteDeconstructMethodParams(builder, method);
+        builder.Append(')');
+        return builder.ToString();
+    }
+
+    public void WriteDeconstructMethodParams(StringBuilder builder, IMethodSymbol method)
+    {
+        builder.Append(this.FullName);
+        builder.Append(" __self");
+        var parameters = method.Parameters;
+        foreach (var param in parameters)
+        {
+            builder.Append(", ");
+            builder.Append(Helper.FullNameOf(param.Type));
+            builder.Append(' ');
+            builder.Append(param.Name);
+        }
+    }
+
     public string DeconstructMethodParamsOf(IMethodSymbol method)
     {
         var builder = new StringBuilder();
-        builder.Append(this.Identifier);
-        builder.Append(" __self");
-
-        foreach (var parameter in method.Parameters)
-        {
-            builder.Append(", out ");
-            builder.Append(Helper.FullNameOf(parameter.Type));
-            builder.Append(' ');
-            builder.Append(parameter.Name);
-        }
-
+        this.WriteDeconstructMethodParams(builder, method);
         return builder.ToString();
     }
 }
 
 static class Helper
 {
-    public static bool SymbolEquals(ISymbol? left, ISymbol? right)
-    {
-        return SymbolEqualityComparer.Default.Equals(left, right);
-    }
+    static SymbolDisplayFormat NameOnly { get; } = new SymbolDisplayFormat(genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters | SymbolDisplayGenericsOptions.IncludeVariance);
+
+    public static bool SymbolEquals(ISymbol? left, ISymbol? right) => SymbolEqualityComparer.Default.Equals(left, right);
 
     public static string ParamsOf(IMethodSymbol method) => string.Join(", ", method.Parameters.Select(p => $"{FullNameOf(p.Type)} {p.Name}"));
     public static string OutParamsOf(IMethodSymbol method) => string.Join(", ", method.Parameters.Select(p => $"out {FullNameOf(p.Type)} {p.Name}"));
 
     public static string FullNameOf(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+    public static string NameOf(ISymbol method) => method.ToDisplayString(NameOnly);
     public static string EscapedFullNameOf(ISymbol symbol) => FullNameOf(symbol).Replace("global::", "").Replace(".", "_").Replace("<", "_").Replace(",", "_").Replace(" ", "").Replace(">", "");
-
-    public static string IdentifierOf(IMethodSymbol method)
-    {
-        if (method.ContainingSymbol is not INamedTypeSymbol classSymbol) return method.Name;
-        if (classSymbol.TypeParameters.IsEmpty) return method.Name;
-        return $"{method.Name}<{string.Join(", ", classSymbol.TypeParameters)}>";
-    }
 
     public static bool IsSerialType(ITypeSymbol type)
     {

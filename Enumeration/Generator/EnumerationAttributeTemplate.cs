@@ -29,8 +29,7 @@ namespace Enumeration
 	[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct)]
 	internal sealed class EnumerationAttribute : global::System.Attribute { }
 	#pragma warning restore IDE0002
-}
-");
+}");
             return this.GenerationEnvironment.ToString();
         }
     }

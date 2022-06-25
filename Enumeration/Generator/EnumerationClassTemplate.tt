@@ -21,7 +21,7 @@ namespace <#= this.Options.Namespace #>
 		}
 
 <# foreach(var method in this.Options.Methods) { #>
-		private class __<#= method.Name #> : <#= this.Options.Identifier #>
+		private class __<#= method.Name #> : <#= this.Options.FullName #>
 		{
 			public __<#= method.Name #>(<#= Helper.ParamsOf(method) #>) : base(Case.<#= method.Name #>) 
 			{
@@ -37,7 +37,7 @@ namespace <#= this.Options.Namespace #>
 <# } #>
 
 <# foreach(var method in this.Options.Methods) { #>
-		public static partial <#= this.Options.Identifier #> <#= method.Name #>(<#= Helper.ParamsOf(method) #>)
+		public static partial <#= this.Options.FullName #> <#= method.Name #>(<#= Helper.ParamsOf(method) #>)
 		{
 			return new __<#= method.Name#>(<#= string.Join(", ", method.Parameters.Select(p => p.Name)) #>);
 		}

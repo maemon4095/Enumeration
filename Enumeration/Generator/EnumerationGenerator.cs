@@ -57,11 +57,10 @@ public sealed class EnumerationGenerator : IIncrementalGenerator
                 if (!attributes.Any(attribute => SymbolEquals(attribute.AttributeClass, attributeSymbol))) return default;
                 return symbol;
             })
-            .Where(static symbol => symbol is not null);
+            .Where(static symbol => symbol is not null)!;
 
         context.RegisterSourceOutput(syntaxProvider, static (context, symbol) =>
         {
-            if (symbol is null) return;
             var options = new EnumerationOptions(symbol);
             context.AddSource(
                 $"{Helper.EscapedFullNameOf(options.Symbol)}.g.cs",

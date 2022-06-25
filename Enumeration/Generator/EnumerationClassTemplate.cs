@@ -42,7 +42,7 @@ namespace Enumeration.Generator
             this.Write("\t\tprivate class __");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write(" : ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.FullName));
             this.Write("\r\n\t\t{\r\n\t\t\tpublic __");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write("(");
@@ -70,7 +70,7 @@ namespace Enumeration.Generator
             this.Write("\r\n");
  foreach(var method in this.Options.Methods) { 
             this.Write("\t\tpublic static partial ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.FullName));
             this.Write(" ");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write("(");

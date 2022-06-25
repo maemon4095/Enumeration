@@ -12,12 +12,12 @@ namespace <#= this.Options.Namespace #>
 	<#= this.Options.AccessibilityString #> static partial class <#= this.Options.Symbol.Name #>_Extension 
 	{
 <# foreach(var method in this.Options.Methods) { #>
-		public static bool <#= Helper.IdentifierOf(method) #>(this <#= this.Options.DeconstructMethodParamsOf(method) #>)
+		public static bool <#= Helper.NameOf(method) #>(this <#= this.Options.DeconstructMethodParamsOf(method) #>)
 <# foreach(var constraint in this.Options.TypeParameterConstraints) { #>
 			<#= constraint #>
 <# } #>
 		{
-			return <#= this.Options.Identifier #>.<#= method.Name #>(__self<# foreach(var parameter in method.Parameters) { #>, out <#= parameter.Name #> <# } #>);
+			return <#= this.Options.FullName #>.<#= method.Name #>(__self<# foreach(var parameter in method.Parameters) { #>, out <#= parameter.Name #> <# } #>);
 		}
 <# } #>
 	}

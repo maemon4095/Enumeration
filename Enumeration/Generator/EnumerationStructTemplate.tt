@@ -6,6 +6,38 @@
 <#@ import namespace="Microsoft.CodeAnalysis" #>
 
 #pragma warning disable CS0169, CS0649
+<# var unionTypeName = "__Union_" + Helper.EscapedFullNameOf(this.Options.Symbol); #>
+namespace Enumeration.Internals
+{
+	[global::System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]
+	struct <#= unionTypeName #>
+	{
+<# foreach(var method in this.Options.Methods) { #>
+<# var referenceLeft = this.Options.ReferenceTypeCount; #>
+		public struct __<#= method.Name #>
+		{
+<# foreach(var parameter in method.Parameters.Where(p => p.Type.IsReferenceType)) { #>
+<# referenceLeft--; #>
+<# if(parameter.Type is ITypeParameterSymbol) { #>
+			public object <#= parameter.Name #>;
+<# } else { #>
+			public <#= Helper.FullNameOf(parameter.Type) #> <#= parameter.Name #>;
+<# } #>
+<# } #>
+<# for(var index = 0; index < referenceLeft; ++index) { #>
+			object __dummy_<#= index #>;
+<# } #>
+<# foreach(var parameter in method.Parameters.Where(p => p.Type is not ITypeParameterSymbol && p.Type.IsUnmanagedType)) { #>
+			public <#= Helper.FullNameOf(parameter.Type) #> <#= parameter.Name #>;
+<# } #>
+		}
+<# } #>
+<# foreach(var method in this.Options.Methods) { #>
+		[global::System.Runtime.InteropServices.FieldOffset(0)]
+		public __<#= method.Name #> <#= method.Name #>;
+<# } #>
+	}
+}
 
 <# if(this.Options.IsNamespaceSpecified) { #>
 namespace <#= this.Options.Namespace #>
@@ -19,36 +51,6 @@ namespace <#= this.Options.Namespace #>
 		}
 		struct __Implement
 		{
-			[global::System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]
-			public struct Union 
-			{
-<# foreach(var method in this.Options.Methods) { #>
-<# var referenceLeft = this.Options.ReferenceTypeCount; #>
-				public struct __<#= method.Name #>
-				{
-<# foreach(var parameter in method.Parameters.Where(p => p.Type.IsReferenceType)) { #>
-<# referenceLeft--; #>
-<# if(parameter.Type is ITypeParameterSymbol) { #>
-					public object <#= parameter.Name #>;
-<# } else { #>
-					public <#= Helper.FullNameOf(parameter.Type) #> <#= parameter.Name #>;
-<# } #>
-<# } #>
-<# for(var index = 0; index < referenceLeft; ++index) { #>
-					object __dummy_<#= index #>;
-<# } #>
-<# foreach(var parameter in method.Parameters.Where(p => p.Type is not ITypeParameterSymbol && p.Type.IsUnmanagedType)) { #>
-					public <#= Helper.FullNameOf(parameter.Type) #> <#= parameter.Name #>;
-<# } #>
-				}
-<# } #>
-
-<# foreach(var method in this.Options.Methods) { #>
-				[global::System.Runtime.InteropServices.FieldOffset(0)]
-				public __<#= method.Name #> <#= method.Name #>;
-<# } #>
-			}
-
 			public struct Serial
 			{
 <# foreach(var (type, count) in this.Options.SerialTypes) { #>
@@ -59,14 +61,14 @@ namespace <#= this.Options.Namespace #>
 			}
 
 			public Case type;
-			public Union union;
+			public Enumeration.Internals.<#= unionTypeName #> union;
 			public Serial serial;
 
-			public <#= this.Options.Identifier #> As() => global::System.Runtime.CompilerServices.Unsafe.As<__Implement, <#= this.Options.Identifier #>>(ref this);
+			public <#= this.Options.FullName #> As() => global::System.Runtime.CompilerServices.Unsafe.As<__Implement, <#= this.Options.FullName #>>(ref this);
 		}
 
 <# foreach(var method in this.Options.Methods) { #>
-		public static partial <#= this.Options.Identifier #> <#= method.Name #>(<#= Helper.ParamsOf(method) #>) 
+		public static partial <#= this.Options.FullName #> <#= method.Name #>(<#= Helper.ParamsOf(method) #>) 
 		{
 			var impl = default(__Implement);
 			impl.type = Case.<#= method.Name #>;
@@ -79,12 +81,11 @@ namespace <#= this.Options.Namespace #>
 			impl.union.<#= method.Name #>.<#= parameter.Name #> = <#= parameter.Name #>;
 <# } #>
 <# } #>
-
 			return impl.As();
 		}
 
 		[global::System.ComponentModel.EditorBrowsable(global::System.ComponentModel.EditorBrowsableState.Never)]
-		public static bool <#= method.Name #>(<#= this.Options.DeconstructMethodParamsOf(method) #>) 
+		public static bool <#= this.Options.DeconstructMethodSignatureOf(method) #>
 		{
 			if (__self.Type == Case.<#= method.Name #>)
 			{

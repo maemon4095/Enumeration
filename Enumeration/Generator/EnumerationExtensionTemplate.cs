@@ -38,7 +38,7 @@ namespace Enumeration.Generator
             this.Write("_Extension \r\n\t{\r\n");
  foreach(var method in this.Options.Methods) { 
             this.Write("\t\tpublic static bool ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.IdentifierOf(method)));
+            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.NameOf(method)));
             this.Write("(this ");
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.DeconstructMethodParamsOf(method)));
             this.Write(")\r\n");
@@ -48,7 +48,7 @@ namespace Enumeration.Generator
             this.Write("\r\n");
  } 
             this.Write("\t\t{\r\n\t\t\treturn ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.FullName));
             this.Write(".");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write("(__self");

@@ -26,7 +26,53 @@ namespace Enumeration.Generator
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("\r\n#pragma warning disable CS0169, CS0649\r\n\r\n");
+            this.Write("\r\n#pragma warning disable CS0169, CS0649\r\n");
+ var unionTypeName = "__Union_" + Helper.EscapedFullNameOf(this.Options.Symbol); 
+            this.Write("namespace Enumeration.Internals\r\n{\r\n\t[global::System.Runtime.InteropServices.Stru" +
+                    "ctLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]\r\n\tstruct ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(unionTypeName));
+            this.Write("\r\n\t{\r\n");
+ foreach(var method in this.Options.Methods) { 
+ var referenceLeft = this.Options.ReferenceTypeCount; 
+            this.Write("\t\tpublic struct __");
+            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
+            this.Write("\r\n\t\t{\r\n");
+ foreach(var parameter in method.Parameters.Where(p => p.Type.IsReferenceType)) { 
+ referenceLeft--; 
+ if(parameter.Type is ITypeParameterSymbol) { 
+            this.Write("\t\t\tpublic object ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
+            this.Write(";\r\n");
+ } else { 
+            this.Write("\t\t\tpublic ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
+            this.Write(" ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
+            this.Write(";\r\n");
+ } 
+ } 
+ for(var index = 0; index < referenceLeft; ++index) { 
+            this.Write("\t\t\tobject __dummy_");
+            this.Write(this.ToStringHelper.ToStringWithCulture(index));
+            this.Write(";\r\n");
+ } 
+ foreach(var parameter in method.Parameters.Where(p => p.Type is not ITypeParameterSymbol && p.Type.IsUnmanagedType)) { 
+            this.Write("\t\t\tpublic ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
+            this.Write(" ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
+            this.Write(";\r\n");
+ } 
+            this.Write("\t\t}\r\n");
+ } 
+ foreach(var method in this.Options.Methods) { 
+            this.Write("\t\t[global::System.Runtime.InteropServices.FieldOffset(0)]\r\n\t\tpublic __");
+            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
+            this.Write(" ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
+            this.Write(";\r\n");
+ } 
+            this.Write("\t}\r\n}\r\n\r\n");
  if(this.Options.IsNamespaceSpecified) { 
             this.Write("namespace ");
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Namespace));
@@ -36,51 +82,7 @@ namespace Enumeration.Generator
             this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Name));
             this.Write(" \r\n\t{\r\n\t\tpublic enum Case \r\n\t\t{\r\n\t\t\t");
             this.Write(this.ToStringHelper.ToStringWithCulture(string.Join(", ", this.Options.Methods.Select(method => method.Name))));
-            this.Write("\r\n\t\t}\r\n\t\tstruct __Implement\r\n\t\t{\r\n\t\t\t[global::System.Runtime.InteropServices.Stru" +
-                    "ctLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]\r\n\t\t\tpublic struct " +
-                    "Union \r\n\t\t\t{\r\n");
- foreach(var method in this.Options.Methods) { 
- var referenceLeft = this.Options.ReferenceTypeCount; 
-            this.Write("\t\t\t\tpublic struct __");
-            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write("\r\n\t\t\t\t{\r\n");
- foreach(var parameter in method.Parameters.Where(p => p.Type.IsReferenceType)) { 
- referenceLeft--; 
- if(parameter.Type is ITypeParameterSymbol) { 
-            this.Write("\t\t\t\t\tpublic object ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(";\r\n");
- } else { 
-            this.Write("\t\t\t\t\tpublic ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
-            this.Write(" ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(";\r\n");
- } 
- } 
- for(var index = 0; index < referenceLeft; ++index) { 
-            this.Write("\t\t\t\t\tobject __dummy_");
-            this.Write(this.ToStringHelper.ToStringWithCulture(index));
-            this.Write(";\r\n");
- } 
- foreach(var parameter in method.Parameters.Where(p => p.Type is not ITypeParameterSymbol && p.Type.IsUnmanagedType)) { 
-            this.Write("\t\t\t\t\tpublic ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(Helper.FullNameOf(parameter.Type)));
-            this.Write(" ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(parameter.Name));
-            this.Write(";\r\n");
- } 
-            this.Write("\t\t\t\t}\r\n");
- } 
-            this.Write("\r\n");
- foreach(var method in this.Options.Methods) { 
-            this.Write("\t\t\t\t[global::System.Runtime.InteropServices.FieldOffset(0)]\r\n\t\t\t\tpublic __");
-            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write(" ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write(";\r\n");
- } 
-            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic struct Serial\r\n\t\t\t{\r\n");
+            this.Write("\r\n\t\t}\r\n\t\tstruct __Implement\r\n\t\t{\r\n\t\t\tpublic struct Serial\r\n\t\t\t{\r\n");
  foreach(var (type, count) in this.Options.SerialTypes) { 
  for(var i = 0; i < count; ++i) { 
             this.Write("\t\t\t\tpublic ");
@@ -92,15 +94,16 @@ namespace Enumeration.Generator
             this.Write(";\r\n");
  } 
  } 
-            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic Case type;\r\n\t\t\tpublic Union union;\r\n\t\t\tpublic Serial serial;\r\n\r" +
-                    "\n\t\t\tpublic ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
+            this.Write("\t\t\t}\r\n\r\n\t\t\tpublic Case type;\r\n\t\t\tpublic Enumeration.Internals.");
+            this.Write(this.ToStringHelper.ToStringWithCulture(unionTypeName));
+            this.Write(" union;\r\n\t\t\tpublic Serial serial;\r\n\r\n\t\t\tpublic ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.FullName));
             this.Write(" As() => global::System.Runtime.CompilerServices.Unsafe.As<__Implement, ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.FullName));
             this.Write(">(ref this);\r\n\t\t}\r\n\r\n");
  foreach(var method in this.Options.Methods) { 
             this.Write("\t\tpublic static partial ");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.Identifier));
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.FullName));
             this.Write(" ");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write("(");
@@ -128,13 +131,10 @@ namespace Enumeration.Generator
             this.Write(";\r\n");
  } 
  } 
-            this.Write("\r\n\t\t\treturn impl.As();\r\n\t\t}\r\n\r\n\t\t[global::System.ComponentModel.EditorBrowsable(g" +
-                    "lobal::System.ComponentModel.EditorBrowsableState.Never)]\r\n\t\tpublic static bool " +
-                    "");
-            this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
-            this.Write("(");
-            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.DeconstructMethodParamsOf(method)));
-            this.Write(") \r\n\t\t{\r\n\t\t\tif (__self.Type == Case.");
+            this.Write("\t\t\treturn impl.As();\r\n\t\t}\r\n\r\n\t\t[global::System.ComponentModel.EditorBrowsable(glo" +
+                    "bal::System.ComponentModel.EditorBrowsableState.Never)]\r\n\t\tpublic static bool ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(this.Options.DeconstructMethodSignatureOf(method)));
+            this.Write("\r\n\t\t{\r\n\t\t\tif (__self.Type == Case.");
             this.Write(this.ToStringHelper.ToStringWithCulture(method.Name));
             this.Write(")\r\n\t\t\t{\r\n");
  foreach(var parameter in method.Parameters) { 
