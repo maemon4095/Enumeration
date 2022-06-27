@@ -12,11 +12,10 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
     [TypeSource(typeof(EnumerationAttribute))]
     private static partial string GetAttributeSource();
 
-    static string EnumerationAttributeFullName => $"{nameof(Enumeration)}.{nameof(EnumerationAttribute)}";
-    static string ConstructorAttributeFullName => $"{nameof(Enumeration)}.{nameof(ConstructorForAttribute)}";
+    static Type EnumerationAttribute => typeof(EnumerationAttribute);
+    static Type ConstructorAttribute => typeof(ConstructorAttribute);
+    static Type CaseAttribute => typeof(CaseAttribute);
     static string IndentString => "    ";
-
-    static SymbolDisplayFormat FormatTypeFullPath { get; } = new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -26,7 +25,7 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
 
     private void ProductInitialSource(IncrementalGeneratorPostInitializationContext context)
     {
-        context.AddSource(EnumerationAttributeFullName, GetAttributeSource());
+        context.AddSource(EnumerationAttribute.FullName, GetAttributeSource());
     }
 
     private void RegisterProductSource(IncrementalGeneratorInitializationContext context)
@@ -34,29 +33,34 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
         var enumerationAttributeProvider = context.CompilationProvider.Select((compilation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            return compilation.GetTypeByMetadataName(EnumerationAttributeFullName) ?? throw new NullReferenceException($"{EnumerationAttributeFullName} was not found.");
+            return compilation.GetTypeByMetadataName(EnumerationAttribute.FullName) ?? throw new NullReferenceException($"{EnumerationAttribute.FullName} was not found.");
         });
         var constructorAttributeProvider = context.CompilationProvider.Select((compilation, token) =>
         {
             token.ThrowIfCancellationRequested();
-            return compilation.GetTypeByMetadataName(ConstructorAttributeFullName) ?? throw new NullReferenceException($"{ConstructorAttributeFullName} was not found.");
+            return compilation.GetTypeByMetadataName(ConstructorAttribute.FullName) ?? throw new NullReferenceException($"{ConstructorAttribute.FullName} was not found.");
         });
-
+        var caseAttributeProvider = context.CompilationProvider.Select((compilation, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            return compilation.GetTypeByMetadataName(CaseAttribute.FullName) ?? throw new NullReferenceException($"{CaseAttribute.FullName} was not found.");
+        });
 
         var provider = context.SyntaxProvider
             .CreateAttribute(enumerationAttributeProvider)
             .Combine(constructorAttributeProvider)
+            .Combine(caseAttributeProvider)
             .Select((tuple, token) =>
             {
-                var ((_, _, symbol, enumerationAttribute, enumerationAttributes), constructorAttribute) = tuple;
+                var (((_, _, symbol, _, _), constructorAttribute), caseAttribute) = tuple;
                 var constructorAttributeData = symbol.GetAttributes().Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, constructorAttribute)).ToImmutableArray();
-                var constructorAttributes = CreateConstructorResolver(constructorAttributeData);
+                var caseAttributeData = symbol.GetAttributes().Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, caseAttribute)).ToImmutableArray();
+                var constructorResolver = CreateConstructorResolver(constructorAttributeData);
 
                 return new Bundle
                 {
                     Symbol = symbol,
-                    EnumerationAttributes = enumerationAttributes,
-                    ConstructorResolver = constructorAttributes,
+                    ConstructorResolver = constructorResolver,
                 };
             });
 
@@ -66,60 +70,87 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
     static IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? ConstructMethod, IMethodSymbol? DeconstructMethod)> CreateConstructorResolver(ImmutableArray<AttributeData> attributes)
     {
 #pragma warning disable RS1024
-        return attributes
-                  .Where(a => a.ConstructorArguments.Length == 2)
-                  .Select(a =>
-                  {
-                      var targetSymbol = a.ConstructorArguments[0].Value as INamedTypeSymbol;
-                      var ctorSymbol = a.ConstructorArguments[1].Value as INamedTypeSymbol;
+        return attributes.Where(a => a.ConstructorArguments.Length == 2)
+                         .Select(a =>
+                         {
+                             if (a.ConstructorArguments[0].Value is not INamedTypeSymbol targetSymbol) return default;
+                             if (a.ConstructorArguments[1].Value is not INamedTypeSymbol ctorSymbol) return default;
 
-                      if (targetSymbol is null) return default;
-                      if (ctorSymbol is null) return default;
+                             var (constructMethod, deconstructMethod) = GetCtorAndDtor(ctorSymbol, targetSymbol);
 
-                      var (constructMethod, deconstructMethod) = GetConstructorAndDeconstructor(ctorSymbol, targetSymbol);
-
-                      return (TargetSymbol: targetSymbol!, constructMethod, deconstructMethod);
-                  })
-                  .Where(tuple =>
-                  {
-                      return tuple != default;
-                  })
-                  .ToImmutableDictionary(
-                  tuple => tuple.TargetSymbol,
-                  tuple =>
-                  {
-                      var (_, constructor, deconstructor) = tuple;
-                      return (constructor, deconstructor);
-                  },
-                  new NamedTypeSymbolEqualityComparer());
+                             return (TargetSymbol: targetSymbol!, constructMethod, deconstructMethod);
+                         })
+                         .Where(tuple =>
+                         {
+                             return tuple is (not null, not null, not null);
+                         })
+                         .ToImmutableDictionary(
+                         tuple => tuple.TargetSymbol,
+                         tuple =>
+                         {
+                             var (_, ctor, dtor) = tuple;
+                             return (ctor, dtor);
+                         },
+                         new NamedTypeSymbolEqualityComparer());
 
 #pragma warning restore RS1024
 
+        static (IMethodSymbol? Ctor, IMethodSymbol? Dtor) GetCtorAndDtor(INamedTypeSymbol ctorType, INamedTypeSymbol target)
+        {
+            var members = ctorType.GetMembers().OfType<IMethodSymbol>();
+            var constructorCandidates = members.Concat(target.Constructors).Where(m => IsConstructorMethod(m, target));
+            var deconstructorCandidates = members.Concat(target.GetMembers().OfType<IMethodSymbol>()).Where(m => IsDeconstructorMethod(m, target));
+            var candidates = constructorCandidates.SelectMany(ctor => deconstructorCandidates.Select(dtor => (Ctor: ctor, Dtor: dtor)));
+            var candidate = candidates.FirstOrDefault((tuple) =>
+            {
+                var (ctor, dtor) = tuple;
+                var ctorParamTypes = ctor.Parameters.Select(p => p.Type);
+                var dtorParamTypes = dtor.Parameters.Select(p => p.Type);
+                if (SymbolEqualityComparer.Default.Equals(dtor.ContainingType, target))
+                {
+                    dtorParamTypes = dtorParamTypes.Skip(1);
+                }
+                return ctorParamTypes.SequenceEqual(dtorParamTypes, SymbolEqualityComparer.Default);
+            });
+
+            return candidate;
+        }
         static bool IsConstructorMethod(IMethodSymbol method, INamedTypeSymbol type)
         {
+            const string MethodName = "Construct";
+            if (SymbolEqualityComparer.Default.Equals(method.ContainingType, type))
+            {
+                return method.MethodKind is MethodKind.Constructor;
+            }
+            if (method.MethodKind is not MethodKind.Ordinary) return false;
             if (method.IsGenericMethod) return false;
             if (method.ReturnsByRef || method.ReturnsByRefReadonly) return false;
-            if (method.Name != "Construct") return false;
+            if (method.Name != MethodName) return false;
             if (!SymbolEqualityComparer.Default.Equals(method.ReturnType, type)) return false;
             if (method.Parameters.Any(p => p.RefKind is not (RefKind.In or RefKind.None))) return false;
             return true;
         }
         static bool IsDeconstructorMethod(IMethodSymbol method, INamedTypeSymbol type)
         {
+            const string MethodName = "Deconstruct";
+            if (SymbolEqualityComparer.Default.Equals(method.ContainingType, type))
+            {
+                if (method.MethodKind is not MethodKind.Ordinary) return false;
+                if (method.IsStatic) return false;
+                if (!method.ReturnsVoid) return false;
+                if (method.Name != MethodName) return false;
+                if (method.Parameters.Any(p => p.RefKind is not RefKind.Out)) return false;
+                return true;
+            }
+
+            if (method.MethodKind is not MethodKind.Ordinary) return false;
             if (method.IsGenericMethod) return false;
             if (!method.ReturnsVoid) return false;
-            if (method.Name != "Deconstruct") return false;
+            if (method.Name != MethodName) return false;
             if (method.Parameters.Length <= 0) return false;
             if (method.Parameters[0].RefKind is not (RefKind.In or RefKind.None)) return false;
             if (method.Parameters.Skip(1).Any(p => p.RefKind is not RefKind.Out)) return false;
             return true;
-        }
-
-        static (IMethodSymbol? Constructor, IMethodSymbol? Deconstructor) GetConstructorAndDeconstructor(INamedTypeSymbol type, INamedTypeSymbol target)
-        {
-            var members = type.GetMembers().OfType<IMethodSymbol>();
-            var constructorCandidates = members.Concat(target.Constructors).Where(m => IsConstructorMethod(m, target));
-            var deconstructor = members.FirstOrDefault(m => IsDeconstructorMethod(m, target));
         }
     }
 
@@ -132,8 +163,7 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
     readonly struct Bundle
     {
         public ISymbol Symbol { get; init; }
-        public ImmutableArray<AttributeData> EnumerationAttributes { get; init; }
-        public IImmutableDictionary<INamedTypeSymbol, (MethodBase? ConstructMethod, MethodBase? DeconstructMethod)> ConstructorResolver { get; init; }
+        public IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? ConstructMethod, IMethodSymbol? DeconstructMethod)> ConstructorResolver { get; init; }
     }
 
     class NamedTypeSymbolEqualityComparer : IEqualityComparer<INamedTypeSymbol>
