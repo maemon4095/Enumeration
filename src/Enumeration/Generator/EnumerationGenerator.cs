@@ -1,8 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SourceGeneratorSupplement;
 using System.Collections.Immutable;
-using System.Reflection;
 
 namespace Enumeration.Generator;
 
@@ -151,12 +149,6 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
             if (method.Parameters.Skip(1).Any(p => p.RefKind is not RefKind.Out)) return false;
             return true;
         }
-    }
-
-
-    private void ProductSource(SourceProductionContext context, Bundle bundle)
-    {
-        var writer = new IndentedWriter(IndentString);
     }
 
     readonly struct Bundle
