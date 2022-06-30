@@ -98,12 +98,11 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
         static (IMethodSymbol? Ctor, IMethodSymbol? Dtor) GetCtorAndDtor(INamedTypeSymbol ctorType, INamedTypeSymbol target)
         {
             var members = ctorType.GetMembers().OfType<IMethodSymbol>();
-            var constructorCandidates = members.Concat(target.Constructors).Where(m => IsConstructorMethod(m, target));
-            var deconstructorCandidates = members.Concat(target.GetMembers().OfType<IMethodSymbol>()).Where(m => IsDeconstructorMethod(m, target));
-            var candidates = constructorCandidates.SelectMany(ctor => deconstructorCandidates.Select(dtor => (Ctor: ctor, Dtor: dtor)));
+            var candidates = members.Product(members).Concat(target.Constructors.Product(target.GetMembers().OfType<IMethodSymbol>()));
             var candidate = candidates.FirstOrDefault((tuple) =>
             {
                 var (ctor, dtor) = tuple;
+                if (!IsConstructorMethod(ctor, target) || !IsDeconstructorMethod(dtor, target)) return false;
                 var ctorParamTypes = ctor.Parameters.Select(p => p.Type);
                 var dtorParamTypes = dtor.Parameters.Select(p => p.Type);
                 if (SymbolEqualityComparer.Default.Equals(dtor.ContainingType, target))
