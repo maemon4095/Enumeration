@@ -50,10 +50,16 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
             .Combine(caseAttributeProvider)
             .Select((tuple, token) =>
             {
-                var (((_, _, symbol, _, _), constructorAttribute), caseAttribute) = tuple;
+                var (((syntax, model, symbol, _, _), constructorAttribute), caseAttribute) = tuple;
                 var constructorAttributeData = symbol.GetAttributes().Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, constructorAttribute)).ToImmutableArray();
                 var caseAttributeData = symbol.GetAttributes().Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, caseAttribute)).ToImmutableArray();
                 var constructorResolver = CreateConstructorResolver(constructorAttributeData);
+                var caseAttributes = syntax.AttributeLists.Select(list =>
+                {
+
+                    return list.Attributes.Select(a => model.GetSymbolInfo(a))
+                                          .Where(info => SymbolEqualityComparer.Default.Equals(info.Symbol, caseAttribute));
+                });
 
                 return new Bundle
                 {
