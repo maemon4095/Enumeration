@@ -58,7 +58,7 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
 
                 return new Bundle
                 {
-                    Symbol = symbol,
+                    Symbol = (symbol as INamedTypeSymbol)!,
                     Cases = cases,
                     ConstructorResolver = constructorResolver,
                 };
@@ -70,7 +70,7 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
 
     class Bundle
     {
-        public ISymbol Symbol { get; init; }
+        public INamedTypeSymbol Symbol { get; init; }
         public IEnumerable<Case> Cases { get; init; }
         public IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? Ctor, IMethodSymbol? Dtor)> ConstructorResolver { get; init; }
     }
