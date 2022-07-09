@@ -75,9 +75,13 @@
 		<Description>Generator of enumerated types, also known as discriminated union.</Description>
 		<Copyright>© maemon4095 2022</Copyright>
 		<PackageTags>sourcegenerator</PackageTags>
-		<PackageProjectUrl>https://github.com/maemon4095/StaticStateMachine</PackageProjectUrl>
+		<PackageProjectUrl>https://github.com/maemon4095/Enumeration</PackageProjectUrl>
 		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
 	
+	<ItemGroup>
+		<!-- create nuget package as analyzer -->
+		<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+	</ItemGroup>
 </Project>
