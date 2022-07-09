@@ -8,14 +8,19 @@
 		<LangVersion>latest</LangVersion>
 		<IsRoslynComponent>true</IsRoslynComponent>
 		<Deterministic>true</Deterministic>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+		<DevelopmentDependency>true</DevelopmentDependency>
 	</PropertyGroup>
 
+	<!-- references -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.1.0" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" />
-		<PackageReference Include="System.CodeDom" Version="6.0.0" />
+		<PackageReference Include="System.CodeDom" Version="6.0.0" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.1.0" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" PrivateAssets="all" />
 	</ItemGroup>
-
+	
+	<!-- T4 -->
 	<ItemGroup>
 		<None Update="Generator\EnumerationAttributeTemplate.tt">
 			<Generator>TextTemplatingFilePreprocessor</Generator>
@@ -62,4 +67,17 @@
 		</Compile>
 	</ItemGroup>
 
+
+	<!-- nuget -->
+	<PropertyGroup>
+		<Authors>maemon4095</Authors>
+		<Version>0.0.0-beta</Version>
+		<Description>Generator of enumerated types, also known as discriminated union.</Description>
+		<Copyright>© maemon4095 2022</Copyright>
+		<PackageTags>sourcegenerator</PackageTags>
+		<PackageProjectUrl>https://github.com/maemon4095/StaticStateMachine</PackageProjectUrl>
+		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	</PropertyGroup>
+	
 </Project>
