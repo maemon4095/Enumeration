@@ -27,7 +27,7 @@ jobs:
           --store-password-in-clear-text
       - name: pack
         run: |
-          dotnet pack -c Release -o ./.artifacts -p:RepositoryUrl='${{ github.server_url }}/${{ github.repository }}'
+          dotnet pack -c Release -o ./.artifacts
     
       - uses: actions/upload-artifact@v3
         with:
