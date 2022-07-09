@@ -53,7 +53,7 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
             {
                 var (((syntax, model, symbol, _, _), constructorAttribute), caseAttribute) = tuple;
                 var constructorAttributeData = symbol.GetAttributes().Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, constructorAttribute)).ToImmutableArray();
-                var cases = CreateCases((symbol as INamedTypeSymbol)!, caseAttribute);
+                var (cases, caseDiagnostic) = CreateCases((symbol as INamedTypeSymbol)!, caseAttribute);
                 var constructorResolver = CreateConstructorResolver(constructorAttributeData);
 
                 return new Bundle
@@ -61,6 +61,7 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
                     Symbol = (symbol as INamedTypeSymbol)!,
                     Cases = cases,
                     ConstructorResolver = constructorResolver,
+                    Diagnostics = caseDiagnostic is null ? Enumerable.Empty<Diagnostic>() : new[] { caseDiagnostic }
                 };
             });
 
@@ -71,8 +72,8 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
     class Bundle
     {
         public INamedTypeSymbol Symbol { get; init; }
-        public IEnumerable<Case> Cases { get; init; }
-        public IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? Ctor, IMethodSymbol? Dtor)> ConstructorResolver { get; init; }
+        public IEnumerable<Case>? Cases { get; init; }
+        public IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? Ctor, IMethodSymbol? Dtor)>? ConstructorResolver { get; init; }
         public IEnumerable<Diagnostic> Diagnostics { get; init; }
     }
 }
