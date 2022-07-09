@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 namespace Enumeration.Generator;
 partial class EnumerationGenerator
 {
-    static IEnumerable<Case> CreateCases(INamedTypeSymbol symbol, INamedTypeSymbol attribute)
+    static (IEnumerable<Case>?, Diagnostic?) CreateCases(INamedTypeSymbol symbol, INamedTypeSymbol attribute)
     {
         var attrCases = symbol.GetAttributes()
                               .Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, attribute))
@@ -19,7 +19,16 @@ partial class EnumerationGenerator
                                 .Where(c => c.HasValue)
                                 .Select(c => c!.Value);
 
-        return attrCases.Concat(memberCases);
+
+        var builder = ImmutableHashSet.CreateBuilder<Case>();
+        foreach (var c in attrCases.Concat(memberCases))
+        {
+            if (builder.Add(c)) continue;
+            var diagnostic = Diagnostics.CaseDuplicationError(c.Location, c.Identifier);
+            return (null, diagnostic);
+        }
+
+        return (builder.ToImmutable(), null);
     }
 
     static Case? CreateCase(AttributeData attr)
@@ -31,7 +40,7 @@ partial class EnumerationGenerator
                                              .OfType<INamedTypeSymbol>()
                                              .Select((s, i) => new CasePart { Identifier = $"arg{i}", Kind = RefKind.In, Type = s })
                                              .ToImmutableArray();
-        return new Case { Identifier = identifier, Method = null, Parts = parts };
+        return new Case { Identifier = identifier, Method = null, Parts = parts, Location = attr.ApplicationSyntaxReference?.GetSyntax().GetLocation()  };
     }
 
     static Case? CreateCase(IMethodSymbol method)
@@ -62,6 +71,7 @@ partial class EnumerationGenerator
         public string Identifier { get; init; }
         public IMethodSymbol? Method { get; init; }
         public ImmutableArray<CasePart> Parts { get; init; }
+        public Location? Location { get; init; }
     }
 
     readonly struct CasePart

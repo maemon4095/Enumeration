@@ -73,5 +73,6 @@ public sealed partial class EnumerationGenerator : IIncrementalGenerator
         public INamedTypeSymbol Symbol { get; init; }
         public IEnumerable<Case> Cases { get; init; }
         public IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? Ctor, IMethodSymbol? Dtor)> ConstructorResolver { get; init; }
+        public IEnumerable<Diagnostic> Diagnostics { get; init; }
     }
 }
