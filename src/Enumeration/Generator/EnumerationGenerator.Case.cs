@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 namespace Enumeration.Generator;
 partial class EnumerationGenerator
 {
-    static (IEnumerable<Case>?, Diagnostic?) CreateCases(INamedTypeSymbol symbol, INamedTypeSymbol attribute)
+    static IEnumerable<Case>? CreateCases(INamedTypeSymbol symbol, INamedTypeSymbol attribute, ref PreprocessContext context)
     {
         var attrCases = symbol.GetAttributes()
                               .Where(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, attribute))
@@ -25,10 +25,10 @@ partial class EnumerationGenerator
         {
             if (builder.Add(c)) continue;
             var diagnostic = Diagnostics.CaseDuplicationError(c.Location, c.Identifier);
-            return (null, diagnostic);
+            context.AddDiagnostic(diagnostic);
+            return null;
         }
-
-        return (builder.ToImmutable(), null);
+        return builder.ToImmutable();
     }
 
     static Case? CreateCase(AttributeData attr)

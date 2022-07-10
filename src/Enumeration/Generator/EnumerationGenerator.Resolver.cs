@@ -6,32 +6,41 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Enumeration.Generator;
 partial class EnumerationGenerator
 {
-    static IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? ConstructMethod, IMethodSymbol? DeconstructMethod)> CreateConstructorResolver(ImmutableArray<AttributeData> attributes)
+    static IImmutableDictionary<INamedTypeSymbol, (IMethodSymbol? ConstructMethod, IMethodSymbol? DeconstructMethod)>? CreateConstructorResolver(ImmutableArray<AttributeData> attributes, ref PreprocessContext context)
     {
+        try
+        {
 #pragma warning disable RS1024
-        var dic = attributes.Where(a => a.ConstructorArguments.Length == 2)
-                     .Select(a =>
-                     {
-                         if (a.ConstructorArguments[0].Value is not INamedTypeSymbol targetSymbol) return default;
-                         if (a.ConstructorArguments[1].Value is not INamedTypeSymbol ctorSymbol) return default;
+            return attributes.Where(a => a.ConstructorArguments.Length == 2)
+                         .Select(a =>
+                         {
+                             if (a.ConstructorArguments[0].Value is not INamedTypeSymbol targetSymbol) return default;
+                             if (a.ConstructorArguments[1].Value is not INamedTypeSymbol ctorSymbol) return default;
 
-                         var (constructMethod, deconstructMethod) = GetCtorAndDtor(ctorSymbol, targetSymbol);
+                             var (constructMethod, deconstructMethod) = GetCtorAndDtor(ctorSymbol, targetSymbol);
 
-                         return (TargetSymbol: targetSymbol!, constructMethod, deconstructMethod);
-                     })
-                     .Where(tuple =>
-                     {
-                         return tuple is (not null, not null, not null);
-                     })
-                     .ToImmutableDictionary(
-                     tuple => tuple.TargetSymbol,
-                     tuple =>
-                     {
-                         var (_, ctor, dtor) = tuple;
-                         return (ctor, dtor);
-                     },
-                     new NamedTypeSymbolEqualityComparer());
+                             return (TargetSymbol: targetSymbol!, constructMethod, deconstructMethod);
+                         })
+                         .Where(tuple =>
+                         {
+                             return tuple is (not null, not null, not null);
+                         })
+                         .ToImmutableDictionary(
+                         tuple => tuple.TargetSymbol,
+                         tuple =>
+                         {
+                             var (_, ctor, dtor) = tuple;
+                             return (ctor, dtor);
+                         },
+                         new NamedTypeSymbolEqualityComparer());
 #pragma warning restore RS1024
+        }
+        catch (ArgumentException)
+        {
+            var diag = Diagnostics.ConstructorDuplicationError(context.Syntax.GetLocation(), context.Symbol);
+            context.AddDiagnostic(diag);
+            return null;
+        }
 
         static (IMethodSymbol? Ctor, IMethodSymbol? Dtor) GetCtorAndDtor(INamedTypeSymbol ctorType, INamedTypeSymbol target)
         {
